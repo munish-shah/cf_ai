@@ -103,7 +103,7 @@ The easiest way to get started is using the automated setup script:
 ./start.sh
 ```
 
-**For Windows users**: If you don't have bash, install one of these:
+**For Windows users**: If you don't have bash, install one of these or perform manual setup below:
 - **Git Bash** (recommended): Download from https://git-scm.com/downloads
 - **WSL** (Windows Subsystem for Linux): Follow [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install)
 
@@ -145,19 +145,25 @@ npx wrangler login
 
 This will open your browser for authentication. Free Cloudflare accounts work fine for this project.
 
-### 3. Configure Account ID (Optional)
+### 3. Configure Account ID
 
 **Important**: Never commit your account ID to git! The setup script will auto-detect it, or you can set it in a `.env` file.
 
-**Option 1: Auto-detection (Recommended)**
-The `start.sh` script will automatically detect your account ID from your authenticated Cloudflare session. No action needed!
-
-**Option 2: Use .env file (Recommended for manual setup)**
+**Option 1: Use .env file (Recommended for manual setup)**
 Create a `.env` file in the project root:
 
 ```bash
 # Copy the example file
 cp .env.example .env
+
+# Edit .env and add your account ID
+# CLOUDFLARE_ACCOUNT_ID=your-account-id-here
+```
+### Windows Non-Bash
+
+```bash
+# Copy the example file
+copy .env.example .env
 
 # Edit .env and add your account ID
 # CLOUDFLARE_ACCOUNT_ID=your-account-id-here
@@ -170,7 +176,7 @@ npx wrangler whoami
 
 The `.env` file is already in `.gitignore`, so it will never be committed to git.
 
-**Option 3: Environment variable (Session only)**
+**Option 2: Environment variable (Session only)**
 If you prefer to set it as an environment variable for just this session:
 
 ```bash
@@ -222,7 +228,7 @@ After deployment, populate the index with Cloudflare documentation:
 
 **Linux/macOS/Git Bash:**
 ```bash
-curl -X POST https://your-worker.your-subdomain.workers.dev/populate
+curl -X POST "https://your-worker.your-subdomain.workers.dev/populate"
 ```
 
 **Windows PowerShell:**
@@ -232,7 +238,7 @@ Invoke-WebRequest -Uri "https://your-worker.your-subdomain.workers.dev/populate"
 
 **Windows CMD:**
 ```cmd
-curl -X POST https://your-worker.your-subdomain.workers.dev/populate
+curl -X POST "https://your-worker.your-subdomain.workers.dev/populate"
 ```
 
 Replace `your-worker.your-subdomain` with your actual Worker URL from step 5.
