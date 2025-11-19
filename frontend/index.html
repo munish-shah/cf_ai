@@ -1,97 +1,1012 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloudflare Developer Assistant</title>
-  <link rel="stylesheet" href="/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare Dev Agent</title>
+    
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cf: {
+                            orange: '#F38020',
+                            gray: '#1d1d1d',
+                            dark: '#0a0a0a',
+                            surface: '#171717'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['Menlo', 'Monaco', 'Courier New', 'monospace'],
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.6s ease-out',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 2. React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 4. Markdown & Syntax Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- VS Code Dark+ theme for Prism (using custom theme) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-toml.min.js"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #444; }
+        
+        /* Markdown Styling with VS Code-like code blocks */
+        .prose pre { 
+            margin: 1rem 0; 
+            border-radius: 0.5rem; 
+            background: #1e1e1e !important; 
+            border: 1px solid #3e3e3e; 
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        .prose pre code {
+            background: transparent !important;
+            padding: 0;
+            border: none;
+            color: #d4d4d4;
+        }
+        .prose code:not(pre code) { 
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace; 
+            font-size: 0.9em; 
+            color: #ce9178;
+            background: rgba(110, 110, 110, 0.2);
+            padding: 0.2em 0.4em;
+            border-radius: 0.25rem;
+        }
+        .prose p { margin-bottom: 0.75rem; line-height: 1.7; color: #d4d4d4; }
+        .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #d4d4d4; }
+        .prose h3 { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #fff; }
+        .prose strong { color: #fff; font-weight: 600; }
+        
+        /* VS Code syntax highlighting overrides */
+        .token.comment { color: #6a9955; font-style: italic; }
+        .token.keyword { color: #569cd6; }
+        .token.string { color: #ce9178; }
+        .token.function { color: #dcdcaa; }
+        .token.number { color: #b5cea8; }
+        .token.operator { color: #d4d4d4; }
+        .token.punctuation { color: #d4d4d4; }
+        .token.class-name { color: #4ec9b0; }
+        .token.property { color: #9cdcfe; }
+        .token.boolean { color: #569cd6; }
+        .token.variable { color: #9cdcfe; }
+        
+        /* Background Grid Pattern */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+        }
+        
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        /* Smooth Scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
 </head>
-<body>
-  <div class="app-container">
-    <header class="header">
-      <div class="header-content">
-        <div class="logo">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <path d="M16 2L4 8V16C4 22.627 9.373 28 16 28C22.627 28 28 22.627 28 16V8L16 2Z" fill="currentColor"/>
-          </svg>
-          <h1>Cloudflare Developer Assistant</h1>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary" id="clearBtn">Clear</button>
-        </div>
-      </div>
-    </header>
+<body class="bg-cf-dark text-gray-200 h-screen flex flex-col font-sans selection:bg-cf-orange selection:text-white overflow-hidden">
+    
+    <div id="root" class="h-full w-full flex flex-col"></div>
 
-    <main class="main-content">
-      <div class="chat-container">
-        <div class="chat-messages" id="chatMessages">
-          <div class="welcome-message">
-            <div class="welcome-icon">✨</div>
-            <h2>Welcome to Cloudflare Developer Assistant</h2>
-            <p>Ask me anything about Cloudflare Workers, or describe a project you want to build.</p>
-            <div class="quick-actions">
-              <button class="quick-action-btn" data-prompt="How do I create a Cloudflare Worker with D1 database?">
-                <span>💾</span>
-                <span>D1 Database Setup</span>
-              </button>
-              <button class="quick-action-btn" data-prompt="Generate a Workers API that stores data in R2 and serves images">
-                <span>🖼️</span>
-                <span>R2 Image API</span>
-              </button>
-              <button class="quick-action-btn" data-prompt="Create a real-time chat app using Durable Objects">
-                <span>💬</span>
-                <span>Durable Objects Chat</span>
-              </button>
-              <button class="quick-action-btn" data-prompt="Build a RAG application with Vectorize and Workers AI">
-                <span>🔍</span>
-                <span>RAG with Vectorize</span>
-              </button>
-            </div>
-          </div>
-        </div>
+    <!-- APPLICATION LOGIC -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-        <div class="input-container">
-          <div class="input-wrapper">
-            <textarea 
-              id="messageInput" 
-              placeholder="Ask a question or describe what you want to build..."
-              rows="1"
-            ></textarea>
-            <div class="input-actions">
-              <button class="btn-icon" id="codeGenBtn" title="Generate Code">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M7.5 5L2.5 10L7.5 15M12.5 5L17.5 10L12.5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-              </button>
-              <button class="btn-primary" id="sendBtn">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+        // --- Constants ---
+        const WORKER_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'https://cf-ai-developer-assistant.munish-shah04.workers.dev'
+            : '';
 
-      <div class="code-panel" id="codePanel">
-        <div class="code-panel-header">
-          <h3>Generated Code</h3>
-          <button class="btn-icon" id="closeCodePanel">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
-        <div class="code-panel-content" id="codePanelContent">
-          <div class="empty-state">
-            <p>Code will appear here when you generate a project</p>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
+        // --- Landing Page Component ---
+        const LandingPage = ({ onStart }) => {
+            return (
+                <div className="h-full w-full flex flex-col relative bg-cf-dark overflow-y-auto">
+                    
+                    {/* Navigation */}
+                    <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-cf-dark/80 border-b border-white/5">
+                        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                                <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-white cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+                                     <div className="w-8 h-8 bg-gradient-to-br from-cf-orange to-orange-600 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20 overflow-hidden relative">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10">
+                                            {/* AI Brain/Neural Network inspired design */}
+                                            <circle cx="12" cy="8" r="2.5" fill="white" opacity="0.95"/>
+                                            <circle cx="7" cy="12" r="1.8" fill="white" opacity="0.85"/>
+                                            <circle cx="17" cy="12" r="1.8" fill="white" opacity="0.85"/>
+                                            <circle cx="12" cy="16" r="2" fill="white" opacity="0.9"/>
+                                            <path d="M12 8L7 12M12 8L17 12M7 12L12 16M17 12L12 16" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.7"/>
+                                            <path d="M9.5 10L12 8L14.5 10" stroke="white" strokeWidth="0.8" strokeLinecap="round" opacity="0.5"/>
+                                        </svg>
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+                                     </div>
+                                     DevAssist
+                                </div>
+                            <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
+                                <a href="#features" className="hover:text-white transition-colors">Features</a>
+                                <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
+                                <a href="https://developers.cloudflare.com/workers/" target="_blank" className="hover:text-white transition-colors">Docs</a>
+                            </div>
+                            <button onClick={onStart} className="px-5 py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-medium rounded-full transition-all border border-white/10 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                                Launch App
+                            </button>
+                        </div>
+                    </nav>
 
-  <script type="module" src="/app.js"></script>
+                    {/* Hero Section */}
+                    <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 overflow-hidden min-h-screen flex flex-col justify-center">
+                        {/* Background Effects */}
+                        <div className="absolute inset-0 bg-grid-pattern pointer-events-none"></div>
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cf-orange/10 rounded-[100%] blur-[120px] animate-pulse-slow pointer-events-none"></div>
+                        
+                        <div className="relative z-10 max-w-5xl mx-auto text-center">
+                            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-white mb-8 leading-[1.1] animate-slide-up">
+                                Build Cloudflare Apps <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cf-orange via-orange-400 to-amber-300">At The Speed of Thought</span>
+                            </h1>
+                            
+                            <p className="text-lg md:text-xl text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed animate-slide-up" style={{animationDelay: '0.1s'}}>
+                                Your AI-powered companion. Generate production-ready code, configure bindings, and debug your architecture in real-time using Workers AI.
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-slide-up" style={{animationDelay: '0.2s'}}>
+                                <button 
+                                    onClick={onStart}
+                                    className="group relative px-8 py-4 bg-cf-orange hover:bg-orange-600 text-white rounded-xl font-semibold text-lg transition-all shadow-[0_0_30px_rgba(243,128,32,0.4)] hover:shadow-[0_0_50px_rgba(243,128,32,0.6)] hover:-translate-y-1 active:translate-y-0"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        Start Building Free
+                                        <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                        </svg>
+                                    </span>
+                                </button>
+                                <a 
+                                    href="https://github.com/munish-shah/cf_ai"
+                                    target="_blank"
+                                    className="px-8 py-4 bg-transparent hover:bg-white/5 text-gray-300 hover:text-white border border-white/10 hover:border-white/20 rounded-xl font-medium text-lg transition-all backdrop-blur-sm"
+                                >
+                                    View on GitHub
+                                </a>
+                            </div>
+                            
+                            <div className="mt-16 pt-8 border-t border-white/5 flex justify-center gap-12 opacity-60 grayscale hover:grayscale-0 transition-all duration-500 animate-fade-in" style={{animationDelay: '0.4s'}}>
+                                <div className="flex items-center gap-2"><span className="text-xl">⚡</span> Workers</div>
+                                <div className="flex items-center gap-2"><span className="text-xl">📦</span> R2</div>
+                                <div className="flex items-center gap-2"><span className="text-xl">💾</span> D1</div>
+                                <div className="flex items-center gap-2"><span className="text-xl">🧠</span> Vectorize</div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Features Grid */}
+                    <section id="features" className="py-24 relative z-10 bg-black/20">
+                        <div className="max-w-7xl mx-auto px-6">
+                            <div className="text-center mb-20">
+                                <h2 className="text-sm font-bold text-cf-orange tracking-widest uppercase mb-2">Powerful Features</h2>
+                                <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Everything you need to ship</h3>
+                                <p className="text-gray-400 max-w-xl mx-auto">Powered by the latest AI models and Cloudflare's global edge network.</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[
+                                    { title: "Workers AI", icon: "⚡", desc: "Generates TypeScript code optimized for the Workers runtime, utilizing V8 isolates for speed.", color: "from-yellow-500/20 to-orange-500/20" },
+                                    { title: "Vectorize RAG", icon: "🧠", desc: "Semantic search over official documentation to provide accurate, hallucination-free answers.", color: "from-purple-500/20 to-pink-500/20" },
+                                    { title: "Durable Objects", icon: "💾", desc: "Stateful consistency for real-time chat, collaboration, and coordination tasks.", color: "from-blue-500/20 to-cyan-500/20" },
+                                    { title: "D1 Database", icon: "📊", desc: "SQL schema generation, query optimization tips, and automatic migration scripts.", color: "from-emerald-500/20 to-green-500/20" },
+                                    { title: "R2 Storage", icon: "📦", desc: "Snippets for S3-compatible object storage integration and presigned URL generation.", color: "from-red-500/20 to-rose-500/20" },
+                                    { title: "Auto Config", icon: "⚙️", desc: "Generates wrangler.toml configurations automatically based on your project requirements.", color: "from-gray-500/20 to-slate-500/20" }
+                                ].map((feature, i) => (
+                                    <div key={i} className="group p-8 rounded-3xl glass-panel hover:bg-white/5 transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                                        <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                                        <div className="relative z-10">
+                                            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                                                {feature.icon}
+                                            </div>
+                                            <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
+                                            <p className="text-gray-400 leading-relaxed text-sm">{feature.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* How it Works Section */}
+                    <section id="how-it-works" className="py-24 border-t border-white/5 relative z-10">
+                         <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[100px] pointer-events-none z-0"></div>
+                         
+                         <div className="max-w-7xl mx-auto px-6 relative z-10">
+                            <div className="text-center mb-20">
+                                <h2 className="text-sm font-bold text-cf-orange tracking-widest uppercase mb-4">Workflow</h2>
+                                <h3 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">From idea to deployment in minutes</h3>
+                                <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                                    Don't get stuck on boilerplate. Describe your logic, and let the agent handle the infrastructure configuration.
+                                </p>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
+                                <div className="space-y-10">
+                                    {[
+                                        { step: "01", title: "Describe your backend", desc: "Chat with the agent about your data model and API requirements." },
+                                        { step: "02", title: "Review generated code", desc: "Get complete TypeScript files and wrangler.toml configuration." },
+                                        { step: "03", title: "Copy and deploy", desc: "Copy the generated code to your project and run 'npx wrangler deploy'." }
+                                    ].map((item, i) => (
+                                        <div key={i} className="flex gap-6">
+                                            <div className="flex-shrink-0 w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center font-mono font-bold text-cf-orange text-lg">
+                                                {item.step}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-2xl font-semibold text-white mb-3">{item.title}</h4>
+                                                <p className="text-gray-400 text-lg leading-relaxed">{item.desc}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="relative overflow-hidden rounded-xl">
+                                    <div className="absolute -inset-1 bg-gradient-to-r from-cf-orange to-purple-600 rounded-xl opacity-20 blur-md"></div>
+                                    <div className="relative rounded-xl bg-[#0b1120] border border-white/10 p-5 shadow-2xl font-mono text-xs">
+                                        <div className="flex items-center gap-2 mb-3 border-b border-white/5 pb-3">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                                            <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                                            <span className="ml-2 text-gray-500 text-[10px]">worker.ts</span>
+                                        </div>
+                                        <div className="text-gray-300 leading-relaxed">
+                                            <span className="text-purple-400">export</span> <span className="text-purple-400">default</span> <span className="text-yellow-300">{"{"}</span><br/>
+                                            &nbsp;&nbsp;<span className="text-purple-400">async</span> <span className="text-blue-400">fetch</span><span className="text-yellow-300">(</span>req, env<span className="text-yellow-300">)</span> <span className="text-yellow-300">{"{"}</span><br/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-purple-400">const</span> <span className="text-blue-400">response</span> <span className="text-purple-400">=</span> <span className="text-purple-400">await</span> env.AI.run<span className="text-yellow-300">(</span><br/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"@cf/meta/llama-3.1-8b-instruct"</span>,<br/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-yellow-300">{"{"}</span> prompt: <span className="text-green-400">req.text()</span> <span className="text-yellow-300">{"}"}</span><br/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-yellow-300">)</span>;<br/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-purple-400">return</span> <span className="text-purple-400">new</span> <span className="text-yellow-300">Response</span><span className="text-yellow-300">(</span>response.response<span className="text-yellow-300">)</span>;<br/>
+                                            &nbsp;&nbsp;<span className="text-yellow-300">}</span><br/>
+                                            <span className="text-yellow-300">{"}"}</span>;
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                         </div>
+                    </section>
+
+                    {/* Architecture Section */}
+                    <section id="architecture" className="py-24 bg-black/20 relative z-20">
+                        <div className="max-w-7xl mx-auto px-6 relative z-10">
+                            <div className="text-center mb-16">
+                                <h2 className="text-sm font-bold text-cf-orange tracking-widest uppercase mb-4">Architecture</h2>
+                                <h3 className="text-4xl md:text-5xl font-bold text-white mb-6">How It Works</h3>
+                                <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+                                    A stateful agent built on Cloudflare Workers, using Workers AI for inference, Vectorize for RAG, and Durable Objects for persistence.
+                                </p>
+                            </div>
+
+                            {/* Core Components */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+                                {[
+                                    { 
+                                        title: "Cloudflare Worker", 
+                                        desc: "Entry point that routes requests and handles CORS",
+                                        detail: "Routes /agent requests to Durable Object, handles /populate and /health endpoints"
+                                    },
+                                    { 
+                                        title: "Durable Object", 
+                                        desc: "Stateful DeveloperAssistantAgent instance",
+                                        detail: "Extends Agents SDK, manages conversation history and project state via SQLite"
+                                    },
+                                    { 
+                                        title: "Agents SDK", 
+                                        desc: "Provides Agent base class, WebSocket, and SQLite",
+                                        detail: "Built-in state management, real-time communication, and persistent storage"
+                                    },
+                                    { 
+                                        title: "Workers AI", 
+                                        desc: "Llama 3.1 8B for chat/code, BGE embeddings for RAG",
+                                        detail: "Serverless GPU inference at the edge for text generation and semantic search"
+                                    },
+                                    { 
+                                        title: "Vectorize", 
+                                        desc: "Vector database storing Cloudflare documentation",
+                                        detail: "Semantic search over docs using 768-dimensional embeddings for context retrieval"
+                                    },
+                                    { 
+                                        title: "SQLite", 
+                                        desc: "Persistent storage via Agents SDK",
+                                        detail: "Stores conversation_messages and project_state tables within Durable Object"
+                                    }
+                                ].map((component, i) => (
+                                    <div key={i} className="p-6 rounded-xl bg-cf-surface border border-white/10 hover:border-cf-orange/30 transition-all duration-300">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className="w-2 h-2 rounded-full bg-cf-orange"></div>
+                                            <h4 className="text-lg font-semibold text-white">{component.title}</h4>
+                                        </div>
+                                        <p className="text-gray-400 text-sm mb-2 leading-relaxed">{component.desc}</p>
+                                        <p className="text-gray-500 text-xs leading-relaxed">{component.detail}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Request Flow */}
+                            <div className="mb-16">
+                                <h4 className="text-xl font-bold text-white mb-8 text-center">Request Flow</h4>
+                                <div className="relative">
+                                    <div className="hidden md:flex items-center justify-between mb-8 relative">
+                                        <div className="absolute top-1.5 left-0 right-0 h-0.5 bg-cf-orange/20 z-0"></div>
+                                        {[
+                                            { label: "User Request", endpoint: "HTTP/WebSocket" },
+                                            { label: "Worker Router", endpoint: "/agent" },
+                                            { label: "Durable Object", endpoint: "DeveloperAssistantAgent" },
+                                            { label: "Vectorize Query", endpoint: "Semantic Search" },
+                                            { label: "Workers AI", endpoint: "LLM + Embeddings" },
+                                            { label: "SQLite Save", endpoint: "State Persistence" },
+                                            { label: "Response", endpoint: "Stream to User" }
+                                        ].map((step, i) => (
+                                            <div key={i} className="flex-1 flex flex-col items-center relative z-10">
+                                                <div className="w-3 h-3 rounded-full bg-cf-orange mb-2"></div>
+                                                <div className="text-center">
+                                                    <div className="text-white text-xs font-medium mb-1">{step.label}</div>
+                                                    <div className="text-gray-500 text-[10px]">{step.endpoint}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="md:hidden space-y-4">
+                                        {[
+                                            { label: "User Request", endpoint: "HTTP/WebSocket" },
+                                            { label: "Worker Router", endpoint: "/agent" },
+                                            { label: "Durable Object", endpoint: "DeveloperAssistantAgent" },
+                                            { label: "Vectorize Query", endpoint: "Semantic Search" },
+                                            { label: "Workers AI", endpoint: "LLM + Embeddings" },
+                                            { label: "SQLite Save", endpoint: "State Persistence" },
+                                            { label: "Response", endpoint: "Stream to User" }
+                                        ].map((step, i) => (
+                                            <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-cf-surface border border-white/10">
+                                                <div className="w-2 h-2 rounded-full bg-cf-orange flex-shrink-0"></div>
+                                                <div className="flex-1">
+                                                    <div className="text-white text-sm font-medium mb-1">{step.label}</div>
+                                                    <div className="text-gray-500 text-xs">{step.endpoint}</div>
+                                                </div>
+                                                {i < 6 && <div className="text-gray-600 text-xs">→</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Technical Details */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div className="p-8 rounded-xl bg-cf-surface border border-white/10">
+                                    <h4 className="text-lg font-bold text-white mb-4">RAG Pipeline</h4>
+                                    <div className="space-y-3 text-sm text-gray-400">
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">1.</span>
+                                            <span>User query is embedded using BGE model (@cf/baai/bge-base-en-v1.5)</span>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">2.</span>
+                                            <span>Vectorize performs cosine similarity search over documentation vectors</span>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">3.</span>
+                                            <span>Top 5 relevant docs are retrieved and formatted as context</span>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">4.</span>
+                                            <span>LLM generates response with documentation context to reduce hallucinations</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-8 rounded-xl bg-cf-surface border border-white/10">
+                                    <h4 className="text-lg font-bold text-white mb-4">State Management</h4>
+                                    <div className="space-y-3 text-sm text-gray-400">
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">1.</span>
+                                            <span>Conversation history stored in conversation_messages table with conversation_id grouping</span>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">2.</span>
+                                            <span>Project state persisted in project_state table for code generation continuity</span>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">3.</span>
+                                            <span>SQLite database initialized per Durable Object instance via Agents SDK</span>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <span className="text-cf-orange flex-shrink-0">4.</span>
+                                            <span>WebSocket connections enable real-time streaming of responses</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Call to Action */}
+                    <section className="py-24 px-6">
+                        <div className="max-w-5xl mx-auto rounded-[2.5rem] bg-gradient-to-r from-cf-orange to-orange-600 p-[1px] shadow-[0_0_100px_rgba(246,130,31,0.2)]">
+                            <div className="bg-[#0f0f0f] rounded-[2.5rem] px-8 py-20 text-center relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+                                <div className="relative z-10">
+                                    <h2 className="text-4xl md:text-6xl font-bold text-white mb-8 tracking-tight">Ready to build the future?</h2>
+                                    <p className="text-gray-400 max-w-2xl mx-auto mb-12 text-xl">Join thousands of developers building on Cloudflare Workers today. Free to start, infinite to scale.</p>
+                                    <button onClick={onStart} className="px-12 py-5 bg-white text-black rounded-full font-bold text-xl hover:bg-gray-100 transition-colors hover:scale-105 active:scale-95 shadow-xl">
+                                        Start Coding Now
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    {/* Footer */}
+                    <footer className="py-12 border-t border-white/5 bg-[#050505]">
+                        <div className="max-w-7xl mx-auto px-6">
+                            <div className="mb-8">
+                                    <div className="flex items-center gap-2 font-bold text-xl text-white mb-4">
+                                         <div className="w-6 h-6 bg-gradient-to-br from-cf-orange to-orange-600 rounded-md flex items-center justify-center shadow-md overflow-hidden relative">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10">
+                                                <circle cx="12" cy="8" r="2" fill="white" opacity="0.95"/>
+                                                <circle cx="7" cy="12" r="1.5" fill="white" opacity="0.85"/>
+                                                <circle cx="17" cy="12" r="1.5" fill="white" opacity="0.85"/>
+                                                <circle cx="12" cy="16" r="1.8" fill="white" opacity="0.9"/>
+                                                <path d="M12 8L7 12M12 8L17 12M7 12L12 16M17 12L12 16" stroke="white" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                                            </svg>
+                                            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+                                         </div>
+                                         DevAssist
+                                    </div>
+                                <p className="text-gray-500 text-sm leading-relaxed">
+                                    Empowering developers to build faster, scalable, and globally distributed applications on the Cloudflare network.
+                                </p>
+                            </div>
+                            <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <p className="text-gray-600 text-sm">© 2024 Cloudflare Dev Agent. Built with Workers, Pages, and React.</p>
+                                <a 
+                                    href="https://www.linkedin.com/in/munish-shah/" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                                    title="LinkedIn"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        // --- Chat Interface Components ---
+
+        const Header = ({ status, onReset }) => (
+            <header className="border-b border-white/5 bg-cf-surface/80 backdrop-blur-xl p-4 flex justify-between items-center z-20 absolute top-0 left-0 right-0 h-16">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-cf-orange to-orange-600 rounded-lg flex items-center justify-center shadow-lg shadow-orange-900/20 cursor-pointer overflow-hidden relative" onClick={onReset}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10">
+                                {/* AI Brain/Neural Network inspired design */}
+                                <circle cx="12" cy="8" r="2.5" fill="white" opacity="0.95"/>
+                                <circle cx="7" cy="12" r="1.8" fill="white" opacity="0.85"/>
+                                <circle cx="17" cy="12" r="1.8" fill="white" opacity="0.85"/>
+                                <circle cx="12" cy="16" r="2" fill="white" opacity="0.9"/>
+                                <path d="M12 8L7 12M12 8L17 12M7 12L12 16M17 12L12 16" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.7"/>
+                                <path d="M9.5 10L12 8L14.5 10" stroke="white" strokeWidth="0.8" strokeLinecap="round" opacity="0.5"/>
+                            </svg>
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+                        </div>
+                    <div>
+                        <h1 className="font-bold text-white text-sm tracking-wide">DevAssist</h1>
+                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+                            <span className={`w-1.5 h-1.5 rounded-full ${status.includes('Connected') || status.includes('Ready') ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]' : 'bg-amber-500'}`}></span>
+                            {status}
+                        </div>
+                    </div>
+                </div>
+                <button onClick={onReset} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors" title="Reset Session">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                        <path d="M3 21v-5h5"/>
+                    </svg>
+                </button>
+            </header>
+        );
+
+        const MessageBubble = ({ role, content, isThinking, thinkingMessage }) => {
+            const isUser = role === 'user';
+            const messageRef = useRef(null);
+            const [displayedContent, setDisplayedContent] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const typingTimeoutRef = useRef(null);
+
+            // Typing effect for assistant messages
+            useEffect(() => {
+                if (isUser || isThinking) {
+                    setDisplayedContent(content || '');
+                    setIsTyping(false);
+                    return;
+                }
+
+                if (!content) {
+                    setDisplayedContent('');
+                    setIsTyping(false);
+                    return;
+                }
+
+                // Reset and start typing effect when content changes
+                if (content && content !== displayedContent) {
+                    // Clear any existing timeout
+                    if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                    }
+                    
+                    setIsTyping(true);
+                    setDisplayedContent('');
+                    let currentIndex = 0;
+                    
+                    const typeNextChar = () => {
+                        if (currentIndex < content.length) {
+                            // Type in chunks for better performance (words or small chunks)
+                            let chunkSize = 1;
+                            const char = content[currentIndex];
+                            
+                            // If we hit a space or newline, type the whole word/chunk
+                            if (char === ' ' || char === '\n') {
+                                chunkSize = 1;
+                            } else {
+                                // Find the next space or newline
+                                const nextSpace = content.indexOf(' ', currentIndex);
+                                const nextNewline = content.indexOf('\n', currentIndex);
+                                const nextBreak = Math.min(
+                                    nextSpace > 0 ? nextSpace : content.length,
+                                    nextNewline > 0 ? nextNewline : content.length
+                                );
+                                chunkSize = Math.min(nextBreak - currentIndex, 5);
+                            }
+                            
+                            const nextIndex = Math.min(currentIndex + chunkSize, content.length);
+                            setDisplayedContent(content.substring(0, nextIndex));
+                            currentIndex = nextIndex;
+                            
+                            // Variable speed: even faster typing
+                            const isInCodeBlock = content.substring(0, currentIndex).split('```').length % 2 === 0;
+                            const delay = isInCodeBlock ? 2 : 5; // Very fast typing
+                            
+                            typingTimeoutRef.current = setTimeout(typeNextChar, delay);
+                        } else {
+                            setIsTyping(false);
+                        }
+                    };
+                    
+                    // Start typing immediately
+                    typingTimeoutRef.current = setTimeout(typeNextChar, 10);
+                }
+
+                return () => {
+                    if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                    }
+                };
+            }, [content, isUser, isThinking]);
+
+            // Update HTML with syntax highlighting when displayed content changes
+            useEffect(() => {
+                if (messageRef.current && !isUser && !isThinking && displayedContent) {
+                    const rawMarkup = marked.parse(displayedContent);
+                    messageRef.current.innerHTML = rawMarkup;
+                    Prism.highlightAllUnder(messageRef.current);
+                }
+            }, [displayedContent, isUser, isThinking]);
+
+            return (
+                <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6 animate-fade-in`}>
+                    <div className={`group relative max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-4 shadow-lg transition-all duration-300 ${
+                        isUser 
+                            ? 'bg-gradient-to-br from-cf-orange to-orange-600 text-white hover:shadow-xl hover:shadow-orange-500/20' 
+                            : 'bg-cf-surface/80 backdrop-blur-sm border border-white/10 text-gray-200 hover:border-white/20 hover:bg-cf-surface'
+                    }`}>
+                        {!isUser && (
+                            <div className="absolute -left-12 top-2 w-10 h-10 rounded-xl bg-gradient-to-br from-cf-orange/20 to-orange-600/20 border border-cf-orange/30 flex items-center justify-center text-lg shadow-lg backdrop-blur-sm">
+                                <span className="filter drop-shadow-sm">🤖</span>
+                            </div>
+                        )}
+                        {isUser ? (
+                            <div className="whitespace-pre-wrap font-medium leading-relaxed">{content}</div>
+                        ) : isThinking ? (
+                            <div className="flex items-center gap-4">
+                                <div className="flex gap-1.5">
+                                    <span className="w-2.5 h-2.5 bg-cf-orange rounded-full animate-bounce shadow-sm" style={{animationDelay: '0s'}}></span>
+                                    <span className="w-2.5 h-2.5 bg-cf-orange rounded-full animate-bounce shadow-sm" style={{animationDelay: '0.2s'}}></span>
+                                    <span className="w-2.5 h-2.5 bg-cf-orange rounded-full animate-bounce shadow-sm" style={{animationDelay: '0.4s'}}></span>
+                                </div>
+                                <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">{thinkingMessage || "Processing..."}</span>
+                            </div>
+                        ) : (
+                            <div className="relative">
+                                <div ref={messageRef} className="prose prose-invert max-w-none text-sm md:text-base leading-relaxed"></div>
+                                {isTyping && (
+                                    <span className="inline-block w-2 h-4 ml-1 bg-cf-orange animate-pulse" style={{verticalAlign: 'baseline'}}></span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const QuickActions = ({ onPrompt }) => {
+            const actions = [
+                { icon: "💾", label: "D1 Database", prompt: "How do I create a Cloudflare Worker with D1 database?" },
+                { icon: "🧠", label: "Vectorize RAG", prompt: "Explain how to build a RAG app with Vectorize and Workers AI" },
+                { icon: "💬", label: "Durable Chat", prompt: "Generate code for a real-time chat app using Durable Objects" },
+                { icon: "📦", label: "R2 Storage", prompt: "Show me how to upload files to R2 using a Worker" },
+            ];
+
+            return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto w-full mb-12">
+                    {actions.map(action => (
+                        <button 
+                            key={action.label}
+                            onClick={() => onPrompt(action.prompt)}
+                            className="flex items-center gap-4 p-4 bg-cf-surface hover:bg-white/5 border border-white/5 hover:border-cf-orange/30 rounded-xl text-left transition-all group shadow-sm hover:shadow-md"
+                        >
+                            <div className="text-2xl bg-black/20 p-2 rounded-lg group-hover:scale-110 transition-transform">{action.icon}</div>
+                            <div>
+                                <div className="text-sm font-semibold text-gray-200 group-hover:text-white">{action.label}</div>
+                                <div className="text-xs text-gray-500 mt-0.5 group-hover:text-gray-400">Click to ask</div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        // --- Main App Container ---
+
+        const App = () => {
+            const [view, setView] = useState('landing'); // 'landing' or 'chat'
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState("");
+            const [status, setStatus] = useState("Connecting...");
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [thinkingMessage, setThinkingMessage] = useState("Processing...");
+            const ws = useRef(null);
+            const messagesEndRef = useRef(null);
+            const inputRef = useRef(null);
+
+            // Auto-scroll to bottom
+            useEffect(() => {
+                if (view === 'chat') {
+                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                }
+            }, [messages, isGenerating, view]);
+
+            // Connect Logic
+            const connect = () => {
+                const wsUrl = WORKER_BASE_URL 
+                    ? WORKER_BASE_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/agent'
+                    : 'wss://' + window.location.host + '/agent';
+                
+                console.log("Attempting WebSocket connection to:", wsUrl);
+                
+                try {
+                    if (ws.current) ws.current.close();
+                    
+                    ws.current = new WebSocket(wsUrl);
+
+                    ws.current.onopen = () => {
+                        setStatus("Connected (WS)");
+                    };
+
+                    ws.current.onclose = () => {
+                        if (status.includes("WS")) {
+                            setStatus("Disconnected (Retrying...)");
+                        }
+                    };
+
+                    ws.current.onerror = (err) => {
+                        console.log("WS Error, falling back to HTTP on interaction");
+                        setStatus("Ready (HTTP)");
+                    };
+
+                    ws.current.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            handleResponseData(data);
+                        } catch (e) {
+                            console.error("Failed to parse WS message", e);
+                        }
+                    };
+                } catch (e) {
+                    console.error("WebSocket init failed:", e);
+                    setStatus("Ready (HTTP)");
+                }
+            };
+
+            useEffect(() => {
+                if (view === 'chat') {
+                    connect();
+                }
+                return () => {
+                    if (ws.current) ws.current.close();
+                };
+            }, [view]);
+
+            const handleResponseData = (data) => {
+                if (data.type === 'thinking' || data.type === 'progress') {
+                    // Update thinking message from WebSocket progress updates
+                    if (data.message) {
+                        setThinkingMessage(data.message);
+                    }
+                } else if (data.type === 'response') {
+                    setIsGenerating(false);
+                    setThinkingMessage("Processing...");
+                    addMessage('assistant', data.message);
+                } else if (data.type === 'complete') {
+                    setIsGenerating(false);
+                    setThinkingMessage("Processing...");
+                    
+                    // Use the explanation which already has code blocks in the right order with proper filenames
+                    let combinedMessage = data.explanation || "";
+                    
+                    // If explanation is empty or doesn't include code blocks, reconstruct from code array
+                    if (!combinedMessage || (!combinedMessage.includes('```') && data.code && data.code.length > 0)) {
+                        combinedMessage = data.explanation || "";
+                        if (data.code && data.code.length > 0) {
+                            data.code.forEach(block => {
+                                const filename = block.filename || 'File';
+                                // Only add if not already in message
+                                if (!combinedMessage.includes(block.code.substring(0, 50))) {
+                                    combinedMessage += `\n\n**${filename}**\n\`\`\`${block.language}\n${block.code}\n\`\`\``;
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Add config if it exists and isn't already in the message
+                    if (data.config && !combinedMessage.includes('wrangler.toml') && !combinedMessage.includes(data.config.substring(0, 50))) {
+                        combinedMessage += `\n\n**wrangler.toml**\n\`\`\`toml\n${data.config}\n\`\`\``;
+                    }
+                    
+                    addMessage('assistant', combinedMessage);
+                } else if (data.type === 'error') {
+                    setIsGenerating(false);
+                    setThinkingMessage("Processing...");
+                    addMessage('assistant', `⚠️ **Error:** ${data.message}`);
+                }
+            };
+
+            const addMessage = (role, content) => {
+                setMessages(prev => [...prev, { role, content }]);
+            };
+
+            const handleSend = async () => {
+                if (!input.trim() || isGenerating) return;
+
+                const userMsg = input.trim();
+                setInput("");
+                addMessage('user', userMsg);
+                setIsGenerating(true);
+
+                const isCodeGen = userMsg.toLowerCase().includes("generate") || 
+                                  userMsg.toLowerCase().includes("create") || 
+                                  userMsg.toLowerCase().includes("code") ||
+                                  userMsg.toLowerCase().includes("build");
+
+                const payload = isCodeGen 
+                    ? { prompt: userMsg, projectType: 'workers' }
+                    : { message: userMsg, conversationId: messages.length > 0 ? messages[messages.length - 1].conversationId : null };
+
+                // Try WebSocket first
+                if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                    ws.current.send(JSON.stringify({
+                        type: isCodeGen ? 'generate' : 'chat',
+                        ...payload
+                    }));
+                } else {
+                    // HTTP Fallback
+                    setStatus("Processing...");
+                    setThinkingMessage("Processing...");
+                    const startTime = Date.now();
+                    
+                    // Show progress updates in both status and thinking bubble
+                    const progressInterval = setInterval(() => {
+                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                        let message = "Processing...";
+                        if (elapsed < 3) {
+                            message = "Processing...";
+                        } else if (elapsed < 6) {
+                            message = "Searching docs...";
+                        } else if (elapsed < 10) {
+                            message = "Generating response...";
+                        } else {
+                            message = "Almost there...";
+                        }
+                        setStatus(message);
+                        setThinkingMessage(message);
+                    }, 1000);
+                    
+                    try {
+                        const endpoint = isCodeGen ? '/agent/generate' : '/agent/chat';
+                        const targetUrl = WORKER_BASE_URL 
+                            ? `${WORKER_BASE_URL}${endpoint}`
+                            : endpoint;
+                        
+                        const res = await fetch(targetUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        clearInterval(progressInterval);
+                        
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            throw new Error(`HTTP ${res.status}: ${errorText}`);
+                        }
+                        
+                        const data = await res.json();
+                        
+                        if (data.code) {
+                            handleResponseData({
+                                type: 'complete',
+                                code: data.code,
+                                config: data.config,
+                                explanation: data.explanation
+                            });
+                        } else {
+                            handleResponseData({
+                                type: 'response',
+                                message: data.message || data.error || 'No response received'
+                            });
+                        }
+                        setStatus("Ready (HTTP)");
+                        setThinkingMessage("Processing...");
+                    } catch (e) {
+                        clearInterval(progressInterval);
+                        setIsGenerating(false);
+                        setThinkingMessage("Processing...");
+                        console.error("HTTP Fallback Error:", e);
+                        addMessage('assistant', `**Connection Error**\n\n${e.message}\n\nPlease check that the backend is deployed and accessible.`);
+                        setStatus("Error");
+                    }
+                }
+            };
+
+            const handleStart = () => {
+                setView('chat');
+                setTimeout(() => {
+                    if (inputRef.current) inputRef.current.focus();
+                }, 100);
+            };
+
+            if (view === 'landing') {
+                return <LandingPage onStart={handleStart} />;
+            }
+
+            return (
+                <div className="flex flex-col h-full bg-cf-dark animate-fade-in">
+                    <Header status={status} onReset={() => { setMessages([]); setView('landing'); }} />
+
+                    <main className="flex-1 overflow-y-auto pt-20 pb-24 px-4 md:px-0 relative scroll-smooth">
+                        <div className="max-w-3xl mx-auto">
+                            {messages.length === 0 ? (
+                                <div className="mt-8 text-center animate-slide-up px-4">
+                                    <div className="inline-block p-5 bg-cf-surface rounded-[2rem] border border-white/5 mb-8 shadow-2xl shadow-black/50">
+                                        <span className="text-5xl animate-float inline-block">👋</span>
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-white mb-3">How can I help you build today?</h2>
+                                    <p className="text-gray-400 mb-10">Ask a question or choose a starter below.</p>
+                                    <QuickActions onPrompt={(text) => { setInput(text); setTimeout(() => { if(inputRef.current) inputRef.current.focus(); }, 100); }} />
+                                </div>
+                            ) : (
+                                <>
+                                    {messages.map((msg, idx) => (
+                                        <MessageBubble key={idx} role={msg.role} content={msg.content} />
+                                    ))}
+                                    {isGenerating && (
+                                        <MessageBubble role="assistant" isThinking={true} thinkingMessage={thinkingMessage} />
+                                    )}
+                                    <div ref={messagesEndRef} className="h-4" />
+                                </>
+                            )}
+                        </div>
+                    </main>
+
+                    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-cf-dark via-cf-dark to-transparent pb-6 pt-10 px-4 z-20">
+                        <div className="max-w-3xl mx-auto relative flex items-end gap-2 bg-cf-surface/90 backdrop-blur-xl border border-white/10 focus-within:border-cf-orange/50 focus-within:ring-1 focus-within:ring-cf-orange/50 rounded-[1.25rem] p-2 shadow-2xl transition-all">
+                            <textarea
+                                ref={inputRef}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder="Ask a question or describe a project to generate..."
+                                className="w-full bg-transparent text-white placeholder-gray-500 text-base px-4 py-3 focus:outline-none resize-none max-h-32 font-sans"
+                                rows="1"
+                                style={{ minHeight: '52px' }}
+                            />
+                            <button
+                                onClick={handleSend}
+                                disabled={!input.trim() || isGenerating}
+                                className={`p-3 rounded-xl mb-0.5 transition-all ${
+                                    !input.trim() || isGenerating 
+                                    ? 'bg-white/5 text-gray-600 cursor-not-allowed' 
+                                    : 'bg-cf-orange hover:bg-orange-600 text-white shadow-lg shadow-orange-900/20 hover:scale-105 active:scale-95'
+                                }`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="text-center mt-2">
+                             <span className="text-[10px] text-gray-600 font-medium tracking-wider uppercase">Powered by Workers AI • Vectorize • Durable Objects</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
-

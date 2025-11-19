@@ -99,47 +99,88 @@ export class DeveloperAssistantAgent extends Agent {
       message: "Searching documentation and generating response...",
     }));
 
-    // Fetch relevant docs and previous conversation context
-    const context = await this.searchDocumentation(message);
-    const conversationHistory = await this.getConversationHistory(convId);
+    // Parallelize these operations for faster response
+    const [context, conversationHistory] = await Promise.all([
+      this.searchDocumentation(message),
+      this.getConversationHistory(convId)
+    ]);
 
-    // System prompt guides the model's behavior and knowledge boundaries
-    const systemPrompt = `You are an expert Cloudflare developer assistant. You help developers build applications on Cloudflare's platform.
+    // Concise system prompt for faster processing
+    // Truncate context if too long to reduce token processing time
+    const maxContextLength = 1000;
+    const truncatedContext = context.length > maxContextLength 
+      ? context.substring(0, maxContextLength) + '...' 
+      : context;
+    
+    // Limit conversation history to last 3 exchanges (6 messages) for faster processing
+    const recentHistory = conversationHistory.slice(-6);
+    
+    const systemPrompt = `You are a Cloudflare developer assistant. Help developers build on Cloudflare's platform.
 
-Your knowledge includes:
-- Cloudflare Workers, Pages, Durable Objects
-- D1 (SQLite), R2 (object storage), KV (key-value), Vectorize (vector database)
-- Workers AI, AI Gateway
-- Best practices for edge computing and serverless architecture
-- wrangler.toml configuration
+Knowledge: Workers, Pages, Durable Objects, D1, R2, KV, Vectorize, Workers AI, wrangler.toml.
+Provide accurate, production-ready code with TypeScript, error handling, and best practices.
 
-Always provide accurate, up-to-date information. When generating code, make sure it's production-ready and follows Cloudflare best practices.
-Use TypeScript for type safety. Include proper error handling and edge cases.
-
-Context from documentation:
-${context}
+Docs context:
+${truncatedContext}
 
 Previous conversation:
-${conversationHistory.length > 0 ? conversationHistory.map(c => `${c.role}: ${c.content}`).join('\n') : 'None'}`;
+${recentHistory.length > 0 ? recentHistory.map(c => `${c.role}: ${c.content}`).join('\n') : 'None'}`;
 
-    const response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...conversationHistory,
-        { role: "user", content: message },
-      ],
-      max_tokens: 2048,
-    });
+    let modelUsed = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+    let response;
+    
+    // Use fewer tokens for chat (faster responses), more for code generation
+    const maxTokens = message.length > 200 || message.toLowerCase().includes('code') || message.toLowerCase().includes('generate') ? 1536 : 1024;
+    
+    try {
+      response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...conversationHistory,
+          { role: "user", content: message },
+        ],
+        max_tokens: maxTokens,
+      });
+      console.log(`[WebSocket Chat] Using model: ${modelUsed}`);
+    } catch (error) {
+      modelUsed = "@cf/meta/llama-3.1-8b-instruct";
+      console.warn("Llama 3.3 not available, trying 3.1:", error);
+      try {
+        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...conversationHistory,
+            { role: "user", content: message },
+          ],
+          max_tokens: maxTokens,
+        });
+        console.log(`[WebSocket Chat] Using model: ${modelUsed} (fallback)`);
+      } catch (fallbackError) {
+        console.error("Model error, trying prompt format:", fallbackError);
+        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          prompt: `${systemPrompt}\n\nUser: ${message}\n\nAssistant:`,
+          max_tokens: maxTokens,
+        });
+        console.log(`[WebSocket Chat] Using model: ${modelUsed} (prompt format fallback)`);
+        if (response && typeof response === 'string') {
+          response = { response };
+        }
+      }
+    }
 
     const assistantMessage = response.response || "I couldn't generate a response.";
     
-    await this.saveConversationMessage(convId, "user", message);
-    await this.saveConversationMessage(convId, "assistant", assistantMessage);
+    // Save messages in parallel for faster response
+    await Promise.all([
+      this.saveConversationMessage(convId, "user", message),
+      this.saveConversationMessage(convId, "assistant", assistantMessage)
+    ]);
 
     ws.send(JSON.stringify({
       type: "response",
       message: assistantMessage,
       conversationId: convId,
+      model: modelUsed,
     }));
   }
 
@@ -154,8 +195,11 @@ ${conversationHistory.length > 0 ? conversationHistory.map(c => `${c.role}: ${c.
       message: "Analyzing requirements...",
     }));
 
-    const context = await this.searchDocumentation(prompt);
-    const projectState = await this.getProjectState();
+        // Parallelize these operations for faster response
+        const [context, projectState] = await Promise.all([
+          this.searchDocumentation(prompt),
+          this.getProjectState()
+        ]);
 
     ws.send(JSON.stringify({
       type: "progress",
@@ -163,41 +207,79 @@ ${conversationHistory.length > 0 ? conversationHistory.map(c => `${c.role}: ${c.
       message: "Generating code and configuration...",
     }));
 
-    const systemPrompt = `You are a Cloudflare code generation expert. Generate complete, production-ready code for Cloudflare Workers.
+    // Concise system prompt for faster processing
+    // Truncate context and project state if too long to reduce token processing time
+    const maxContextLength = 1500;
+    const truncatedContext = context.length > maxContextLength 
+      ? context.substring(0, maxContextLength) + '...' 
+      : context;
+    
+    const projectStateStr = JSON.stringify(projectState, null, 2);
+    const maxStateLength = 800;
+    const truncatedState = projectStateStr.length > maxStateLength 
+      ? projectStateStr.substring(0, maxStateLength) + '...' 
+      : projectStateStr;
+    
+    const systemPrompt = `Generate production-ready TypeScript code for Cloudflare Workers.
 
-Requirements:
-1. Generate TypeScript code (not JavaScript)
-2. Include proper type definitions
-3. Add error handling
-4. Follow Cloudflare best practices
-5. Include wrangler.toml configuration if needed
-6. Add comments only where necessary for complex logic
-7. Make code clean and maintainable
+Requirements: TypeScript, type definitions, error handling, Cloudflare best practices, wrangler.toml if needed, minimal comments.
 
-Documentation context:
-${context}
+Docs context:
+${truncatedContext}
 
-Current project state:
-${JSON.stringify(projectState, null, 2)}`;
+Project state:
+${truncatedState}`;
 
-    const response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Generate code for: ${prompt}${projectType ? `\nProject type: ${projectType}` : ''}` },
-      ],
-      max_tokens: 4096,
-    });
+    let modelUsed = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+    let response;
+    try {
+      response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Generate code for: ${prompt}${projectType ? `\nProject type: ${projectType}` : ''}` },
+        ],
+        max_tokens: 3072,
+      });
+      console.log(`[WebSocket Code Gen] Using model: ${modelUsed}`);
+    } catch (error) {
+      modelUsed = "@cf/meta/llama-3.1-8b-instruct";
+      console.warn("Llama 3.3 not available, trying 3.1:", error);
+      try {
+        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Generate code for: ${prompt}${projectType ? `\nProject type: ${projectType}` : ''}` },
+          ],
+          max_tokens: 3072,
+        });
+        console.log(`[WebSocket Code Gen] Using model: ${modelUsed} (fallback)`);
+      } catch (fallbackError) {
+        console.error("Model error, trying prompt format:", fallbackError);
+        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          prompt: `${systemPrompt}\n\nUser: Generate code for: ${prompt}${projectType ? `\nType: ${projectType}` : ''}\n\nAssistant:`,
+          max_tokens: 3072,
+        });
+        console.log(`[WebSocket Code Gen] Using model: ${modelUsed} (prompt format fallback)`);
+        if (response && typeof response === 'string') {
+          response = { response };
+        }
+      }
+    }
 
     const generatedCode = response.response || "";
     
     const codeBlocks = this.extractCodeBlocks(generatedCode);
     const config = this.extractConfig(generatedCode);
+    
+    // Preserve original order: explanation with code blocks in their natural positions
+    const explanation = this.preserveOrderedContent(generatedCode, codeBlocks);
 
     ws.send(JSON.stringify({
       type: "complete",
       code: codeBlocks,
       config: config,
-      explanation: this.extractExplanation(generatedCode),
+      explanation: explanation,
+      model: modelUsed,
     }));
 
     await this.saveProjectState({
@@ -222,21 +304,24 @@ ${JSON.stringify(projectState, null, 2)}`;
         return "No documentation context available.";
       }
 
-      // Semantic search in Vectorize
+      // Semantic search in Vectorize (reduced topK for faster queries)
       const results = await this.env.VECTORIZE_INDEX.query(
         queryVector.data[0],
-        { topK: 5, returnMetadata: true }
+        { topK: 3, returnMetadata: true }
       );
 
       if (!results || results.length === 0) {
         return "No relevant documentation found.";
       }
 
-      // Format results for LLM context
+      // Format results for LLM context (truncate long content for faster processing)
       return results
         .map((result) => {
           const metadata = result.metadata as Record<string, string>;
-          return `Title: ${metadata.title || 'Unknown'}\nContent: ${metadata.content || result.id}\nURL: ${metadata.url || ''}`;
+          const content = metadata.content || result.id || '';
+          // Truncate content to ~500 chars per result to reduce token count
+          const truncatedContent = content.length > 500 ? content.substring(0, 500) + '...' : content;
+          return `Title: ${metadata.title || 'Unknown'}\nContent: ${truncatedContent}\nURL: ${metadata.url || ''}`;
         })
         .join("\n\n---\n\n");
     } catch (error) {
@@ -246,17 +331,56 @@ ${JSON.stringify(projectState, null, 2)}`;
   }
 
   // Parse markdown code blocks from LLM response
-  // Handles both named files and anonymous code blocks
-  private extractCodeBlocks(text: string): Array<{ filename: string; code: string; language: string }> {
+  // Handles both named files and anonymous code blocks, preserving order and extracting filenames from context
+  private extractCodeBlocks(text: string): Array<{ filename: string; code: string; language: string; order: number }> {
     const codeBlockRegex = /```(\w+)?\s*(?:filename="([^"]+)")?\n([\s\S]*?)```/g;
-    const blocks: Array<{ filename: string; code: string; language: string }> = [];
+    const blocks: Array<{ filename: string; code: string; language: string; order: number }> = [];
     let match;
+    let order = 0;
 
     while ((match = codeBlockRegex.exec(text)) !== null) {
+      const language = match[1] || "typescript";
+      let filename = match[2] || "";
+      
+      // If no filename in code block, try to extract from preceding text
+      if (!filename) {
+        const beforeBlock = text.substring(0, match.index);
+        // Look for common patterns like "**filename.ext**", "filename.ext:", "Create filename.ext", etc.
+        const filenamePatterns = [
+          /\*\*([^\*\n]+\.(ts|js|json|toml|md|txt))\*\*/i,
+          /([a-zA-Z0-9_\-\.\/]+\.(ts|js|json|toml|md|txt)):/i,
+          /(?:create|add|generate|write|save)\s+([a-zA-Z0-9_\-\.\/]+\.(ts|js|json|toml|md|txt))/i,
+          /(?:file|file name|filename)[\s:]+([a-zA-Z0-9_\-\.\/]+\.(ts|js|json|toml|md|txt))/i,
+        ];
+        
+        for (const pattern of filenamePatterns) {
+          const filenameMatch = beforeBlock.match(pattern);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+            break;
+          }
+        }
+        
+        // If still no filename and it's wrangler.toml related, infer it
+        if (!filename && (beforeBlock.toLowerCase().includes('wrangler') || language === 'toml')) {
+          filename = 'wrangler.toml';
+        }
+        
+        // If still no filename, try to infer from language and context
+        if (!filename) {
+          if (language === 'typescript' || language === 'ts') {
+            filename = 'src/index.ts';
+          } else if (language === 'json') {
+            filename = 'package.json';
+          }
+        }
+      }
+      
       blocks.push({
-        language: match[1] || "typescript",
-        filename: match[2] || "",
+        language,
+        filename,
         code: match[3].trim(),
+        order: order++,
       });
     }
 
@@ -266,8 +390,9 @@ ${JSON.stringify(projectState, null, 2)}`;
       if (fallbackMatch) {
         blocks.push({
           language: "typescript",
-          filename: "",
+          filename: "src/index.ts",
           code: fallbackMatch[0].replace(/```\w*\n?/g, "").replace(/```/g, "").trim(),
+          order: 0,
         });
       }
     }
@@ -289,15 +414,87 @@ ${JSON.stringify(projectState, null, 2)}`;
     return withoutCode || "Code generated successfully.";
   }
 
+  // Preserve the original order of text and code blocks
+  private preserveOrderedContent(text: string, codeBlocks: Array<{ filename: string; code: string; language: string; order: number }>): string {
+    if (codeBlocks.length === 0) {
+      return text.trim();
+    }
+
+    // Split text by code blocks while preserving order
+    const codeBlockRegex = /```(\w+)?\s*(?:filename="([^"]+)")?\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+    const parts: Array<{ type: 'text' | 'code'; content: string; order?: number }> = [];
+    let codeIndex = 0;
+
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      // Add text before code block
+      if (match.index > lastIndex) {
+        const textBefore = text.substring(lastIndex, match.index).trim();
+        if (textBefore) {
+          parts.push({ type: 'text', content: textBefore });
+        }
+      }
+      
+      // Add code block reference
+      if (codeIndex < codeBlocks.length) {
+        parts.push({ type: 'code', content: '', order: codeIndex });
+        codeIndex++;
+      }
+      
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remainingText = text.substring(lastIndex).trim();
+      if (remainingText) {
+        parts.push({ type: 'text', content: remainingText });
+      }
+    }
+
+    // Reconstruct with proper formatting, preserving original spacing
+    let result = '';
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (part.type === 'text') {
+        // Preserve original spacing - don't add extra newlines
+        result += part.content;
+        // Add spacing only if next part is code
+        if (i < parts.length - 1 && parts[i + 1].type === 'code') {
+          result += '\n\n';
+        } else if (i < parts.length - 1) {
+          result += '\n\n';
+        }
+      } else if (part.type === 'code' && part.order !== undefined && codeBlocks[part.order]) {
+        const block = codeBlocks[part.order];
+        const filename = block.filename || 'File';
+        // Only add filename header if it's meaningful
+        if (filename && filename !== 'File' && filename !== 'src/index.ts') {
+          result += `**${filename}**\n\n`;
+        }
+        result += `\`\`\`${block.language}\n${block.code}\n\`\`\``;
+        // Add spacing only if not last part
+        if (i < parts.length - 1) {
+          result += '\n\n';
+        }
+      }
+    }
+
+    return result.trim();
+  }
+
   private async getConversationHistory(conversationId: string): Promise<Array<{ role: string; content: string }>> {
     try {
+      // Limit to 10 most recent messages for faster processing
       const result = await this.sql`
         SELECT role, content FROM conversation_messages
         WHERE conversation_id = ${conversationId}
-        ORDER BY created_at ASC
-        LIMIT 20
+        ORDER BY created_at DESC
+        LIMIT 10
       `;
-      return result as Array<{ role: string; content: string }>;
+      // Reverse to get chronological order
+      return (result as Array<{ role: string; content: string }>).reverse();
     } catch (error) {
       return [];
     }
@@ -379,18 +576,22 @@ ${JSON.stringify(projectState, null, 2)}`;
         );
       }
 
-      const context = await this.searchDocumentation(message);
-      const conversationHistory = await this.getConversationHistory(conversationId || "default");
+      // Parallelize these operations for faster response
+      const [context, conversationHistory] = await Promise.all([
+        this.searchDocumentation(message),
+        this.getConversationHistory(conversationId || "default")
+      ]);
 
       const systemPrompt = `You are an expert Cloudflare developer assistant. Help developers build on Cloudflare's platform.
 
 Documentation context:
 ${context}`;
 
-      // Try Llama 3.1 8B as fallback if 3.3 isn't available
+      // Try Llama 3.3 first (as recommended), fallback to 3.1 if unavailable
       let response;
+      let modelUsed = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
       try {
-        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+        response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
           messages: [
             { role: "system", content: systemPrompt },
             ...conversationHistory,
@@ -398,16 +599,33 @@ ${context}`;
           ],
           max_tokens: 2048,
         });
+        console.log(`[HTTP Chat] Using model: ${modelUsed}`);
       } catch (error) {
-        // Fallback to any available model
-        console.error("Model error, trying alternative:", error);
-        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-          prompt: `${systemPrompt}\n\nUser: ${message}\n\nAssistant:`,
-          max_tokens: 2048,
-        });
-        // Convert to message format
-        if (response && typeof response === 'string') {
-          response = { response };
+        // Fallback to Llama 3.1 8B if 3.3 isn't available
+        modelUsed = "@cf/meta/llama-3.1-8b-instruct";
+        console.warn("Llama 3.3 not available, trying 3.1:", error);
+        try {
+          response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...conversationHistory,
+              { role: "user", content: message },
+            ],
+            max_tokens: 2048,
+          });
+          console.log(`[HTTP Chat] Using model: ${modelUsed} (fallback)`);
+        } catch (fallbackError) {
+          // Final fallback to prompt format
+          console.error("Model error, trying prompt format:", fallbackError);
+          response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+            prompt: `${systemPrompt}\n\nUser: ${message}\n\nAssistant:`,
+            max_tokens: 2048,
+          });
+          console.log(`[HTTP Chat] Using model: ${modelUsed} (prompt format fallback)`);
+          // Convert to message format
+          if (response && typeof response === 'string') {
+            response = { response };
+          }
         }
       }
 
@@ -419,6 +637,7 @@ ${context}`;
         JSON.stringify({
           message: response.response || "I couldn't generate a response. Please try again.",
           conversationId: convId,
+          model: modelUsed,
         }),
         {
           headers: { "Content-Type": "application/json" },
@@ -454,44 +673,69 @@ ${context}`;
         );
       }
 
-      const context = await this.searchDocumentation(prompt);
-      const projectState = await this.getProjectState();
+      // Parallelize these operations for faster response
+      const [context, projectState] = await Promise.all([
+        this.searchDocumentation(prompt),
+        this.getProjectState()
+      ]);
 
       const systemPrompt = `Generate production-ready Cloudflare Workers code in TypeScript.
 
 Documentation context:
 ${context}`;
 
-      // Use Llama 3.1 8B (more widely available)
+      // Try Llama 3.3 first (as recommended), fallback to 3.1 if unavailable
       let response;
+      let modelUsed = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
       try {
-        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+        response = await this.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Generate code for: ${prompt}${projectType ? `\nType: ${projectType}` : ''}` },
+            { role: "user", content: `Generate code for: ${prompt}${projectType ? `\nProject type: ${projectType}` : ''}` },
           ],
-          max_tokens: 4096,
+          max_tokens: 3072,
         });
+        console.log(`[Code Generation] Using model: ${modelUsed}`);
       } catch (error) {
-        console.error("Model error:", error);
-        // Fallback to prompt format
-        response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-          prompt: `${systemPrompt}\n\nUser: Generate code for: ${prompt}${projectType ? `\nType: ${projectType}` : ''}\n\nAssistant:`,
-          max_tokens: 4096,
-        });
-        if (response && typeof response === 'string') {
-          response = { response };
+        // Fallback to Llama 3.1 8B if 3.3 isn't available
+        modelUsed = "@cf/meta/llama-3.1-8b-instruct";
+        console.warn("Llama 3.3 not available, trying 3.1:", error);
+        try {
+          response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Generate code for: ${prompt}${projectType ? `\nProject type: ${projectType}` : ''}` },
+            ],
+            max_tokens: 3072,
+          });
+          console.log(`[Code Generation] Using model: ${modelUsed} (fallback)`);
+        } catch (fallbackError) {
+          // Final fallback to prompt format
+          console.error("Model error, trying prompt format:", fallbackError);
+          response = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+            prompt: `${systemPrompt}\n\nUser: Generate code for: ${prompt}${projectType ? `\nType: ${projectType}` : ''}\n\nAssistant:`,
+            max_tokens: 3072,
+          });
+          console.log(`[Code Generation] Using model: ${modelUsed} (prompt format fallback)`);
+          if (response && typeof response === 'string') {
+            response = { response };
+          }
         }
       }
 
       const generatedCode = response.response || "";
       const codeBlocks = this.extractCodeBlocks(generatedCode);
+      const config = this.extractConfig(generatedCode);
+      
+      // Preserve original order: explanation with code blocks in their natural positions
+      const explanation = this.preserveOrderedContent(generatedCode, codeBlocks);
 
       return new Response(
         JSON.stringify({
           code: codeBlocks,
-          config: this.extractConfig(generatedCode),
-          explanation: this.extractExplanation(generatedCode),
+          config: config,
+          explanation: explanation,
+          model: modelUsed,
         }),
         {
           headers: { "Content-Type": "application/json" },

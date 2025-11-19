@@ -5,4 +5,6 @@ dist/
 *.log
 .env
 .env.local
+# Node version manager files (but keep .nvmrc)
+.node-version
 

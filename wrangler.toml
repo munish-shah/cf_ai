@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2024-11-06"
 compatibility_flags = ["nodejs_compat"]
 
-# Add your Cloudflare account ID here
+# Add your Cloudflare account ID here (will be auto-detected by start.sh)
 account_id = "294c2e61b3fba84b10aa3834230a5483"
 
 [ai]

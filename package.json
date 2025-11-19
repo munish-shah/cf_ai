@@ -21,13 +21,16 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "agents": "^0.1.0",
-    "@cloudflare/workers-types": "^4.20241106.0"
+    "agents": "^0.2.23",
+    "@cloudflare/workers-types": "^4.20251119.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241106.0",
-    "typescript": "^5.3.3",
-    "wrangler": "^3.78.0"
+    "@cloudflare/workers-types": "^4.20251119.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.49.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
 
