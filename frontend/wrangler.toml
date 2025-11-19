@@ -1,0 +1,6 @@
+name = "cf-ai-developer-assistant-pages"
+compatibility_date = "2024-11-06"
+
+[env.production]
+name = "cf-ai-developer-assistant-pages"
+

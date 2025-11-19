@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloudflare Developer Assistant</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L4 8V16C4 22.627 9.373 28 16 28C22.627 28 28 22.627 28 16V8L16 2Z" fill="currentColor"/>
+          </svg>
+          <h1>Cloudflare Developer Assistant</h1>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary" id="clearBtn">Clear</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <div class="welcome-message">
+            <div class="welcome-icon">✨</div>
+            <h2>Welcome to Cloudflare Developer Assistant</h2>
+            <p>Ask me anything about Cloudflare Workers, or describe a project you want to build.</p>
+            <div class="quick-actions">
+              <button class="quick-action-btn" data-prompt="How do I create a Cloudflare Worker with D1 database?">
+                <span>💾</span>
+                <span>D1 Database Setup</span>
+              </button>
+              <button class="quick-action-btn" data-prompt="Generate a Workers API that stores data in R2 and serves images">
+                <span>🖼️</span>
+                <span>R2 Image API</span>
+              </button>
+              <button class="quick-action-btn" data-prompt="Create a real-time chat app using Durable Objects">
+                <span>💬</span>
+                <span>Durable Objects Chat</span>
+              </button>
+              <button class="quick-action-btn" data-prompt="Build a RAG application with Vectorize and Workers AI">
+                <span>🔍</span>
+                <span>RAG with Vectorize</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea 
+              id="messageInput" 
+              placeholder="Ask a question or describe what you want to build..."
+              rows="1"
+            ></textarea>
+            <div class="input-actions">
+              <button class="btn-icon" id="codeGenBtn" title="Generate Code">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M7.5 5L2.5 10L7.5 15M12.5 5L17.5 10L12.5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="btn-primary" id="sendBtn">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-panel" id="codePanel">
+        <div class="code-panel-header">
+          <h3>Generated Code</h3>
+          <button class="btn-icon" id="closeCodePanel">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="code-panel-content" id="codePanelContent">
+          <div class="empty-state">
+            <p>Code will appear here when you generate a project</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
+

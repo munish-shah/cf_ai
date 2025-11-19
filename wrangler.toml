@@ -1,0 +1,27 @@
+name = "cf-ai-developer-assistant"
+main = "src/index.ts"
+compatibility_date = "2024-11-06"
+compatibility_flags = ["nodejs_compat"]
+
+# Add your Cloudflare account ID here
+account_id = "294c2e61b3fba84b10aa3834230a5483"
+
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "cloudflare-docs"
+
+[durable_objects]
+bindings = [
+  { name = "DEVELOPER_AGENT", class_name = "DeveloperAssistantAgent", script_name = "cf-ai-developer-assistant" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeveloperAssistantAgent"]
+
+[vars]
+ENVIRONMENT = "production"
+
