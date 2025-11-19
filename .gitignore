@@ -7,4 +7,6 @@ dist/
 .env.local
 # Node version manager files (but keep .nvmrc)
 .node-version
+# Prevent committing account_id (security)
+wrangler.toml.bak
 

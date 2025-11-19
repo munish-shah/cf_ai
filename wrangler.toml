@@ -3,8 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-11-06"
 compatibility_flags = ["nodejs_compat"]
 
-# Add your Cloudflare account ID here (will be auto-detected by start.sh)
-account_id = "294c2e61b3fba84b10aa3834230a5483"
+# Account ID will be set via CLOUDFLARE_ACCOUNT_ID environment variable
+# Or auto-detected by start.sh (never commit your account_id to git!)
+# account_id = "your-account-id-here"
 
 [ai]
 binding = "AI"

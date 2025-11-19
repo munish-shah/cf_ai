@@ -97,17 +97,23 @@ DevAssist is architected as a distributed system leveraging Cloudflare's edge co
 
 The easiest way to get started is using the automated setup script:
 
-### Linux/macOS
+### macOS/Linux/Windows (Bash)
 
 ```bash
 ./start.sh
 ```
 
+**For Windows users**: If you don't have bash, install one of these:
+- **Git Bash** (recommended): Download from https://git-scm.com/downloads
+- **WSL** (Windows Subsystem for Linux): Follow [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install)
+
+Then run `./start.sh` in Git Bash or WSL.
+
 This script will:
 1. Check prerequisites (Node.js, npm)
 2. Install dependencies locally
 3. Authenticate with Cloudflare (opens browser)
-4. Auto-detect and configure your account ID
+4. Auto-detect your account ID (uses environment variable for security)
 5. Create Vectorize index if needed
 6. Deploy the Worker
 7. Populate Vectorize with documentation
@@ -115,37 +121,9 @@ This script will:
 
 The frontend will be available at `http://localhost:8788` (or the next available port if 8788 is in use) and will connect to your deployed Worker. The actual port will be shown in the terminal output.
 
-### Windows
-
-Open PowerShell and run:
-
-```powershell
-.\start.ps1
-```
-
-**Note**: If you get an execution policy error, you may need to allow script execution:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-Then run the script again:
-
-```powershell
-.\start.ps1
-```
-
-The script will perform the same automated setup as the Linux/macOS version:
-1. Check prerequisites (Node.js, npm)
-2. Install dependencies locally
-3. Authenticate with Cloudflare (opens browser)
-4. Auto-detect and configure your account ID
-5. Create Vectorize index if needed
-6. Deploy the Worker
-7. Populate Vectorize with documentation
-8. Start the local frontend development server
-
-The frontend will be available at `http://localhost:8788` (or the next available port if 8788 is in use) and will connect to your deployed Worker. The actual port will be shown in the terminal output.
+**Important Notes:**
+- Account ID is set via `CLOUDFLARE_ACCOUNT_ID` environment variable (never committed to git)
+- If deployment fails with "workers.dev subdomain" error, visit https://dash.cloudflare.com → Workers & Pages → open Workers menu to create your subdomain
 
 ## Manual Setup
 
@@ -167,7 +145,9 @@ npx wrangler login
 
 This will open your browser for authentication. Free Cloudflare accounts work fine for this project.
 
-### 3. Configure Account ID
+### 3. Configure Account ID (Optional)
+
+**Important**: Never commit your account ID to git! Use an environment variable instead.
 
 Get your account ID:
 
@@ -175,7 +155,22 @@ Get your account ID:
 npx wrangler whoami
 ```
 
-Add it to `wrangler.toml`:
+Set it as an environment variable:
+
+```bash
+# Linux/macOS
+export CLOUDFLARE_ACCOUNT_ID='your-account-id-here'
+
+# Windows (Git Bash)
+export CLOUDFLARE_ACCOUNT_ID='your-account-id-here'
+
+# Windows (PowerShell)
+$env:CLOUDFLARE_ACCOUNT_ID='your-account-id-here'
+```
+
+**Note**: Wrangler can also auto-detect your account ID from your authenticated session, so this step is optional.
+
+Alternatively, you can add it to `wrangler.toml` (but make sure it's in `.gitignore`):
 
 ```toml
 account_id = "your-account-id"
@@ -186,9 +181,7 @@ account_id = "your-account-id"
 Create a Vectorize index for storing documentation embeddings:
 
 ```bash
-npx wrangler vectorize create cloudflare-docs \
-  --dimensions=768 \
-  --metric=cosine
+npx wrangler vectorize create cloudflare-docs --dimensions=768 --metric=cosine
 ```
 
 Note: Vectorize is in beta and may require enabling in your Cloudflare dashboard or account verification.
@@ -200,6 +193,12 @@ Deploy the backend Worker:
 ```bash
 npm run deploy
 ```
+
+**Important**: If you get an error about "workers.dev subdomain", you need to create one first:
+1. Go to https://dash.cloudflare.com
+2. Navigate to **Workers & Pages**
+3. Open the **Workers** menu for the first time (this creates your subdomain automatically)
+4. Then run `npm run deploy` again
 
 The deployment output will show your Worker URL (e.g., `https://cf-ai-developer-assistant.your-subdomain.workers.dev`).
 

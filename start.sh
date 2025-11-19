@@ -1,4 +1,7 @@
 #!/bin/bash
+# Cloudflare Developer Assistant - Automated Setup Script
+# Works on macOS, Linux, and Windows (via Git Bash or WSL)
+# For Windows: Use Git Bash (https://git-scm.com/downloads) or WSL
 
 # Don't exit on error immediately - we want to handle Node.js version issues gracefully
 set -e
@@ -252,29 +255,21 @@ else
 fi
 echo ""
 
-# Get account ID if not set (check for both commented and uncommented)
-# Also check if existing account_id is valid (32 hex chars)
-EXISTING_ACCOUNT_ID=$(grep "^account_id = \"" wrangler.toml 2>/dev/null | sed 's/.*account_id = "\([^"]*\)".*/\1/' | head -1)
-if [ ! -z "$EXISTING_ACCOUNT_ID" ] && echo "$EXISTING_ACCOUNT_ID" | grep -qE '^[a-f0-9]{32}$'; then
-    echo -e "${GREEN}✅ Valid account ID already set in wrangler.toml${NC}"
+# Get account ID from environment variable or auto-detect (NEVER write to wrangler.toml to avoid committing it)
+echo "🔍 Getting Cloudflare account ID..."
+ACCOUNT_ID=""
+
+# Method 1: Check environment variable (preferred - never committed to git)
+if [ ! -z "$CLOUDFLARE_ACCOUNT_ID" ] && echo "$CLOUDFLARE_ACCOUNT_ID" | grep -qE '^[a-f0-9]{32}$'; then
+    ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
+    echo -e "${GREEN}✅ Account ID found in CLOUDFLARE_ACCOUNT_ID environment variable${NC}"
+    export CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID"
 else
-    # Clean up invalid account_id if present
-    if [ ! -z "$EXISTING_ACCOUNT_ID" ]; then
-        echo -e "${YELLOW}⚠️  Invalid account ID found in wrangler.toml, will replace it${NC}"
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' '/^account_id = /d' wrangler.toml
-        else
-            sed -i '/^account_id = /d' wrangler.toml
-        fi
-    fi
-    
-    echo "🔍 Getting Cloudflare account ID..."
-    # Try multiple methods to get account ID, but validate it's a 32-char hex string
-    # Method 1: Try to get from wrangler whoami (may include account info)
+    # Method 2: Try to get from wrangler whoami (may include account info)
     WHOAMI_OUTPUT=$($WRANGLER_CMD whoami 2>&1)
     ACCOUNT_ID=$(echo "$WHOAMI_OUTPUT" | grep -oE '[a-f0-9]{32}' | head -1)
     
-    # Method 2: Check wrangler config file (if it exists)
+    # Method 3: Check wrangler config file (if it exists)
     if [ -z "$ACCOUNT_ID" ]; then
         WRANGLER_CONFIG="$HOME/.wrangler/config/default.toml"
         if [ -f "$WRANGLER_CONFIG" ]; then
@@ -282,7 +277,7 @@ else
         fi
     fi
     
-    # Method 3: Try to get from Cloudflare API (list accounts)
+    # Method 4: Try to get from Cloudflare API (list accounts)
     if [ -z "$ACCOUNT_ID" ]; then
         # Try using wrangler to get account info via API
         API_OUTPUT=$($WRANGLER_CMD whoami --json 2>/dev/null || echo "")
@@ -296,60 +291,28 @@ else
         fi
     fi
     
-    # Method 4: Will be extracted from Vectorize error or deployment output if needed
+    # Method 5: Will be extracted from Vectorize error or deployment output if needed
     # (This happens later in the script)
     
     # Validate account ID format (must be exactly 32 hex characters)
     if [ ! -z "$ACCOUNT_ID" ] && echo "$ACCOUNT_ID" | grep -qE '^[a-f0-9]{32}$'; then
-        echo -e "${GREEN}✅ Valid account ID detected: ${ACCOUNT_ID:0:8}...${ACCOUNT_ID:24}${NC}"
+        echo -e "${GREEN}✅ Valid account ID auto-detected: ${ACCOUNT_ID:0:8}...${ACCOUNT_ID:24}${NC}"
+        echo -e "${YELLOW}Note: Setting as environment variable (not writing to wrangler.toml for security)${NC}"
+        export CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID"
     else
         ACCOUNT_ID=""
-        echo -e "${YELLOW}⚠️  Could not auto-detect account ID from whoami.${NC}"
-        echo "This is OK - we'll try to extract it from deployment or Vectorize operations."
-        echo "If those fail, wrangler will use your authenticated session automatically."
+        echo -e "${YELLOW}⚠️  Could not auto-detect account ID.${NC}"
+        echo "This is OK - wrangler can get it from your authenticated session."
         echo ""
-        echo "Note: account_id in wrangler.toml is optional - wrangler can get it from your authenticated session."
-        echo "You can also find your account ID in:"
+        echo "To set it manually, use:"
+        echo "  export CLOUDFLARE_ACCOUNT_ID='your-account-id-here'"
+        echo ""
+        echo "You can find your account ID in:"
         echo "  - Cloudflare Dashboard -> Right sidebar"
         echo "  - Or it will be shown in deployment output"
     fi
-    
-    if [ ! -z "$ACCOUNT_ID" ] && echo "$ACCOUNT_ID" | grep -qE '^[a-f0-9]{32}$'; then
-        # Validate account ID is 32 hex chars before writing
-        # Add account_id to wrangler.toml
-        if grep -q "^# account_id" wrangler.toml; then
-            # Replace commented line with actual account_id
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s/^# account_id = .*/account_id = \"$ACCOUNT_ID\"/" wrangler.toml
-            else
-                sed -i "s/^# account_id = .*/account_id = \"$ACCOUNT_ID\"/" wrangler.toml
-            fi
-        elif grep -q "^account_id = \"your-account-id\"" wrangler.toml; then
-            # Replace placeholder with actual account_id
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s/^account_id = \"your-account-id\"/account_id = \"$ACCOUNT_ID\"/" wrangler.toml
-            else
-                sed -i "s/^account_id = \"your-account-id\"/account_id = \"$ACCOUNT_ID\"/" wrangler.toml
-            fi
-        else
-            # Insert after name line (macOS compatible)
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "/^name =/a\\
-account_id = \"$ACCOUNT_ID\"
-" wrangler.toml
-            else
-                sed -i "/^name =/a\\
-account_id = \"$ACCOUNT_ID\"
-" wrangler.toml
-            fi
-        fi
-        echo -e "${GREEN}✅ Account ID added to wrangler.toml${NC}"
-    elif [ ! -z "$ACCOUNT_ID" ]; then
-        echo -e "${RED}❌ Invalid account ID format detected. Skipping auto-configuration.${NC}"
-        echo "Please manually set account_id in wrangler.toml with a valid 32-character hex string"
-    fi
-    echo ""
 fi
+echo ""
 
 # Check if Vectorize index exists
 echo "🔍 Checking Vectorize index..."
@@ -434,6 +397,10 @@ echo "If deployment fails with AI errors, enable Workers AI at:"
 echo "https://dash.cloudflare.com -> Workers & Pages -> AI"
 echo ""
 
+# Wrangler will auto-detect account_id from authenticated session
+# If CLOUDFLARE_ACCOUNT_ID is set, it will be available but wrangler gets it from session
+# We never write account_id to wrangler.toml to avoid committing it to git
+
 # Capture deployment output to extract worker URL
 DEPLOY_OUTPUT=$(npm run deploy 2>&1)
 DEPLOY_EXIT=$?
@@ -443,11 +410,28 @@ if [ $DEPLOY_EXIT -ne 0 ]; then
     echo ""
     echo -e "${RED}❌ Deployment failed${NC}"
     echo ""
+    
+    # Check for specific error: workers.dev subdomain not set up
+    if echo "$DEPLOY_OUTPUT" | grep -qi "workers.dev subdomain\|10063"; then
+        echo -e "${YELLOW}⚠️  Workers.dev subdomain not set up!${NC}"
+        echo ""
+        echo "You need to create a workers.dev subdomain first:"
+        echo "1. Go to: https://dash.cloudflare.com"
+        echo "2. Navigate to: Workers & Pages"
+        echo "3. Open the Workers menu for the first time (this creates your subdomain automatically)"
+        echo "4. Then run this script again"
+        echo ""
+        echo "Alternatively, you can set up the subdomain via:"
+        echo "  $WRANGLER_CMD subdomain create"
+        echo ""
+        exit 1
+    fi
+    
     echo -e "${YELLOW}Troubleshooting:${NC}"
     echo "1. Check Workers AI is enabled in your dashboard"
     echo "2. Verify your account email if prompted"
     echo "3. Free accounts work, but some features may need activation"
-    echo "4. Ensure account_id is set in wrangler.toml"
+    echo "4. If you have an account_id, set it as: export CLOUDFLARE_ACCOUNT_ID='your-id'"
     echo ""
     exit 1
 fi
