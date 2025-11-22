@@ -515,10 +515,5 @@ Built with:
 - [Vectorize](https://developers.cloudflare.com/vectorize/)
 - [Durable Objects](https://developers.cloudflare.com/durable-objects/)
 
-## AI-Assisted Development
-
-This project was developed with AI assistance for code generation, documentation, and optimization. See `PROMPTS.md` for details on AI prompts used during development.
-
----
 
 **Note**: This project requires a Cloudflare account with Workers AI enabled. Some features may require account verification depending on your region and account status.
